@@ -1,0 +1,284 @@
+---
+title: "Demonstration of using satellite data in rainfall runoff modelling"
+author: "Willem Vervoort & Dipangkar Kundu"
+date: "Friday, January 2, 2015"
+output: word_document
+---
+
+This document will demonstrate how you can use satellite MODIS16 ET data in a rainfall runoff model. It will go through the download of satellite data, the conversion of satellite data and the extraction of satellite data for the location, followed by the inclusion of the data into the model and how you would use this in calibration.
+
+# Packages
+For this we will use the MODISTools package in R, this can be installed in R using the command `install.packages("MODISTools")`. Instructions can also be found in the package manual. We will also use several other packages whcih assist with mapping and reprojecting. We will also use the package hydromad to do the modelling as this will allow using several conceptual rainfall runoff models.
+
+###Step 1. 
+We will first load the packages and load the rainfall, flow and temperature data from the Cotter catchment. This is the original data and follows the format of the zoo data frame as described in the tutorial of the package hydromad. The flow data and rainfall are in mm, the E (potential evaporation) data are the daily maximum temperatures, which can be used as a proxy for potential E.
+
+```{r preliminaries}
+require(MODISTools)
+require(hydromad)
+# set proxy on Sydney campus
+Sys.setenv(http_proxy="web-cache.usyd.edu.au:8080")
+
+# load older flow and climate data for Cotter, see hydromad manual
+load("x:/vervoort/IITKharagpur/Cotter.rdata")
+head(Cotter)
+```
+### Step 2
+Now define the Latitudes and Longitudes necessary to extract the points. This is done by matching the GIS shape file for the extent of the Corin catchment, which was derived earlier using GIS, to a single projected MODIS tile. Using some tools in R we can extract the latitudes and longitudes for each of the pixels in the catchment.
+
+
+```{r CorinDataPoints, fig.width=6,fig.height=6}
+setwd("x:/vervoort/IITKharagpur")
+## Download and work with the MODIS reprojection tool to reproject tiles
+
+# Following packages are required
+# make sure all packages are updated
+require(raster)
+require(maptools)
+require(rgdal)
+
+# Reading the shape file of the catchment
+corin <- readShapePoly("corin_pro.shp")
+
+# setting up the projection of the shapefile
+proj <- "+proj=longlat +ellps=WGS84"
+crs(corin) <- proj
+
+
+# reading in the MODIS file
+
+modis <- raster("test1") # The projection is similar to corin
+image(modis)
+plot(corin, add = T)
+
+# Now clipping to the catchment boundary
+modis.corin <- crop(modis, extent(corin)) 
+modis.corin <- mask(modis.corin, corin)
+
+image(modis.corin)
+plot(corin, add = T)
+# Now extracting the points
+
+p <- rasterToPoints(modis.corin) # it contains the cell values as well
+
+#plotting 
+points(p)
+
+# only taking the x(lon) and y(lat) values
+xy.loc <- data.frame(lon = p[,1], lat = p[,2])
+```
+### Step 3
+This step takes quite some time, as this involves connecting to the server and downloading the data using the package MODISTools. The `coords` data.frame should list the coordinates for all the pixels that we are going to extract on the transect. The argument `Size` indicates the number of pixels around the central pixel that needs to be downloaded. In this case we have coordinates for all the pixels and we just download the pixels using the function `MODISSubsets`. I have commented this statement out in this document as this takes very long.
+
+```{r extracting_MODIS}
+coords <- data.frame(lat=xy.loc$lat, 
+               long=xy.loc$lon,
+               start.date=rep(2000,nrow(xy.loc)), 
+               end.date=rep(2008,nrow(xy.loc)), 
+               transect=1:nrow(xy.loc))
+
+# We need to figure out the name of the product, you can use GetProducts()
+GetProducts()
+# and check out the data bands that are in the product
+GetBands(Product="MOD16A2")
+
+# # Now use MODISSubsets (Commented out as this takes very long)
+# MODISSubsets(LoadDat=coords[116:120,], Product = "MOD16A2",
+#                Bands=c("ET_1km","ET_QC_1km"), StartDate=T, Size=c(0,0),
+#                SaveDir="x:/vervoort/IITKharagpur/MODIS")
+
+```
+
+### Step 4
+Once we have all the Satellite ET data extracted, we need to calculate some sort of average for the catchment and than we can merge this with the original data (Cotter) and fit a hydrological model.
+
+```{r ETsummary, fig.width=6,fig.height=6}
+x1 <- list.files (path="MODIS",pattern= (".asc"))
+n <- nrow(read.csv(paste("MODIS/",x1[1],sep=""),header=F))
+
+Store <- data.frame(Year = numeric(length=n),
+                    Jdate = numeric(length=n),
+                    ET = numeric(length=n))
+Store1 <- list()
+
+for (i in 1:length(x1)) {
+  Mdata <- read.csv(paste("MODIS/",x1[i],sep=""),header=F)
+  Store[,1] <- as.numeric(substr(Mdata[,8],2,5))
+  Store[,2] <- as.numeric(substr(Mdata[,8],6,8))
+  Store[,3] <- Mdata[,11]/10 ##  0.1 scaling factor (see MODIS read_me)
+  Store1[[i]] <- Store
+}
+
+
+test <- do.call(rbind,Store1)
+# check distribution
+hist(test$ET, main="Histogram of raw ET values across all pixels", 
+     xlab="8 daily sum ET (mm)")
+
+ET.mean <- aggregate(test[,3],list(Jdate=test$Jdate, Year=test$Year), 
+                     mean,na.rm=T)
+days.cor <- c(rep(8,45),6,rep(c(rep(8,45),5),3),rep(8,45),6,
+              rep(c(rep(8,45),5),3),rep(8,45),6)
+# length(days.cor)
+# # should equal
+# nrow(z.mean)
+ET.mean.cor <- ET.mean$x/days.cor
+#z.mean.cor is ET/days.cor so it is the ET for one day, rather than the sum of 8 days - however, it is still at 8-day intervals
+
+plot(ET.mean$x, type="p", ylab="ET (mm)",ylim=c(0,16)) 
+# this is the 8 day sum of ET
+points(ET.mean.cor,lty=2,col="red") #this is the 8 day sum divided by 8 (or 5/6)
+legend("topleft",c("8 day sum of ET", "daily values"),
+       col=c(1,"red"), pch=1)
+
+# reset z.mean for rest of script
+ET.mean.raw <- ET.mean
+ET.mean <- ET.mean.cor
+
+
+## get dates for each 8-day tile
+for (i in 1:length(days.cor)) {
+  if (i == 1) {
+    dates.tiles <- seq.Date(as.Date("2000-01-01"),
+                            by=days.cor[i]-1,length.out=2)
+  } else {
+    dates.tiles <- c(dates.tiles,
+                     (seq.Date(as.Date(dates.tiles[length(dates.tiles)]),
+                      by=days.cor[i],length.out=2))[2])
+  }
+}
+
+modis.days <- ET.mean.raw ## Julian days the modis image was taken
+dates <- as.character(seq.Date(as.Date("2000-01-01"),
+                               to=as.Date("2008-12-31"),by=1))
+Jdates <- c(1:length(dates[grep("2000",dates)]),
+            1:length(dates[grep("2001",dates)]),
+            1:length(dates[grep("2002",dates)]), 
+            1:length(dates[grep("2003",dates)]),
+            1:length(dates[grep("2004",dates)]),
+            1:length(dates[grep("2005",dates)]),
+            1:length(dates[grep("2006",dates)]),
+            1:length(dates[grep("2007",dates)]),
+            1:length(dates[grep("2008",dates)]))
+full.days <- 1:length(Jdates)
+# create a dataframe to combine
+JDates2 <- data.frame(count=full.days,Julian=Jdates,dates=dates,
+                      year=as.numeric(substr(dates,1,4)))
+
+# find matching Modis days
+modis.days2 <- JDates2[(JDates2$Julian %in% modis.days$Jdate & 
+                    JDates2$year %in% modis.days$Year),] 
+
+## Loess smooth
+smooth.interpET <- loess.smooth(modis.days2$count, ET.mean, span = 0.04, 
+                                degree = 2, evaluation = length(Jdates))$y
+    # smooth.interp is the daily, lumped, aET value, with length of 4383.
+
+
+
+## Plot smooth  and linear spline
+plot(full.days,smooth.interpET, type = "l", xaxt="n", lwd=2,
+     ylim = c(0,3), ylab = "MODIS ET (mm)", xlab = "Time")       
+m.days <- as.Date(paste(modis.days$Jdate,modis.days$Year,sep="-"),"%j-%Y")
+points(modis.days2$dates,ET.mean,col="red")
+ticks <- cumsum(rep(365, times = 10))-365
+axis(1, at = ticks, labels = 2000:2009) 
+legend("topleft",c("smooth MODIS ET", "MODIS 8 day values"),lwd=c(1,NA),
+       col=c(1,"red"), pch=c(NA,1))
+
+```
+
+## Step 5 Hydromad and combining the data
+We will use the spline interpolation in our example of fitting. The following section shows how to use this data in  fitting routine with the package Hydromad. In this case we will fit the model GR4J (Perrin et al. 2003 J Hydro 279:275–289). We will first add the MODIS ET as a column to the dataset.
+
+```{r merge_data}
+# Make Modis ET data set into a zoo series
+aET <- zoo(smooth.interpET, order.by=time(Cotter),frequency=1)
+
+Cotter <- merge(Cotter,aET=aET)
+head(Cotter)
+```
+
+We can now create the calibration and validation data and check the mass balance. Note that he mass balance is positive for both periods, suggesting water is lost somewhere. See the discussion in Vervoort et al. 2014 J. Hydro 519 on this.
+```{r cal_val}
+data.cal <- window(Cotter, start = "2000-01-01",end = "2004-12-31")
+ok<-complete.cases(data.cal)
+summary(ok) # no missing values
+sumP.cal <- sum(data.cal$P, na.rm=T)
+sumQ.cal <- sum(data.cal$Q, na.rm=T)
+sumET.cal <- sum(data.cal$aET, na.rm=T)
+# report the mass balance
+balance.cal <- sumP.cal-sumQ.cal-sumET.cal
+balance.cal
+
+data.val <- window(Cotter, start = "2005-01-01", end = "2008-12-31")
+ok2<-complete.cases(data.val)
+summary(ok2) # no missing values
+sumP.val <- sum(data.val$P, na.rm=T)
+sumQ.val <- sum(data.val$Q, na.rm=T)
+sumET.val <- sum(data.val$aET, na.rm=T)
+# report the mass balance
+balance.val <- sumP.val-sumQ.val-sumET.val
+balance.val
+```
+### fitting the model
+The next step is to define a GR4J model using the HYDROMAD package. I am not going into the detail off the HYDROMAD package or the fitting, as all of this can be found on the <a href="http://hydromad.catchment.org">HYDROMAD website</a>. 
+```{r Model}
+hydromad.options(order=c(2,1))
+hydromad.options(trace=TRUE)
+options(warn=1)
+
+# Define the model, important to define return_state=T
+# parameter guesses based on Perrin et al. 2003
+cormod.Q <- hydromad(DATA=data.cal,
+          sma = "gr4j", routing = "gr4jrouting", 
+          x1 = c(100,1200), x2 = c(-30,3), x3 = c(20,500), x4 = c(1.1,2.9), 
+          etmult=c(0.05,0.5), 
+          return_state=TRUE)
+
+# use Viney's objective function(includes Bias), 
+# see http://hydromad.catchment.org/#hydromad.stats
+hydromad.stats("viney" = function(Q, X, ...) {
+    hmadstat("r.squared")(Q, X, ...) -
+      5*(abs(log(1+hmadstat("rel.bias")(Q,X)))^2.5)})
+# Using shuffled complex evolution algorithm for fitting
+corfit.Q<- fitBySCE(cormod.Q,  objective=~hmadstat("viney")(Q, X),
+                           control=list(ncomplex=20))
+		 
+summary(corfit.Q)
+coef(corfit.Q)
+hmadstat("viney")(Q=data.cal$Q,X=corfit.Q$fitted.values)
+```
+It comes up with a fairly good fit with a an NSE of `r round(as.numeric(summary(corfit.Q)[8]),2)`, if the "loss" term in the routing component (`x2`) is increased substantially to `r round(as.numeric(coef(corfit.Q)[1]),2)`, and `x3` the capacity of the groundwater store is also increased to `r round(as.numeric(coef(corfit.Q)[2]),2)`. This compensates for the waterbalance difference that was observed in the calibration data set.
+These results are for the traditional fit on stream flow, and does not use the actual ET values from the MODIS satellite. To do this we need to set up the calibration to simultaneously calibrate on both the MODIS aET and the streamflow. Here the weighting factor w is set to 0.5 following Vervoort et al. (2014).
+```{r fitting_aET, fig.width=6,fig.height=6}
+w <- 0.5
+corfit.both <- fitBySCE(cormod.Q, 
+                        objective=~w*hmadstat("viney")(DATA$aET,U$ET) 
+                        + (1-w)*hmadstat("viney")(Q,X),
+                         control=list(ncomplex=20))
+summary(corfit.both)
+coef(corfit.both)
+hmadstat("viney")(Q=data.cal$Q,X=corfit.both$fitted.values)
+hmadstat("r.squared")(Q=data.cal$aET,X=corfit.both$U$ET)
+
+plot(data.cal$aET, xlab="Date", ylab="Actual ET (mm/day)", col="red",
+     lwd=4, lty=2,ylim=c(0,2))
+lines(corfit.both$U$ET)
+legend("topleft",c("MODIS ET", "Predicted AET"),lwd=c(3,1),col=c("red",1),lty=c(2,1))
+```
+The results here are also fairly good fit on Q with a an NSE of `r round(as.numeric(summary(corfit.both)[8]),2)`. However, the NSE for the fit on ET is not as good, but this indicates definciencies in the structure of GR4J. Actual ET in GR4J is produced by the "production store", which is defined by x1, and can be 0 when rainfall exceeds the Evaporation estimate. Thus the output is not really equal to actual ET. 
+However, the plot indicates that the predicted data reasonably follow the MODIS estimates with the exception of 2003 and 2004. This is interesting, as the catchment was affected by a major bushfire in 2003, and this non-stationarity is of course not included in the model, but is picked up by the satellite data,
+Including the MODIS ET data as a calibration dataset has affected the estimate of `etmult` and decreased this value to `r round(as.numeric(coef(corfit.Q)[5]),2)`. This parameter would be specifically affected as it is scales the input E (in this case the daily maximum temperature) to the potential ET in the model, which is of course the main driver of the actual ET. The other parameters are also affected. Because the model is now constrained by both ET and Q, the actual model parameters should be more representative. This can be tested using the validation dataset.
+
+## Step 6 validation
+
+```{r validation}
+corfit.Q.val <- update(corfit.Q, newdata=data.val)
+summary(corfit.Q.val)
+
+corfit.both.val <- update(corfit.both, newdata=data.val)
+
+summary(corfit.both.val)
+```
+In both cases the NSE for the validation is lower than for the calibration, but the validation NSE for the calibration on both datasets is slightly better, even though the bias is slightly higher. In other words,for this specific catchment, and this specific model (GR4J), the inclusion of the satellite data makes little difference in the calibration and validation. This is might indicate that GR4J is not very sensitive to the ET prediction. Or it might be that the inclusion of the loss term in GR4J leads to better outcomes.
