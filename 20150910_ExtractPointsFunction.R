@@ -1,3 +1,8 @@
+# ------------------------------
+# Satellite Hydromad project
+# Willem Vervoort/Joseph Guillaume
+# Sept 2015
+# Utility function to 
 # Extract the latitude and longitude of points in a shape file (catchment)
 # This requires:
 # a shape file of the area

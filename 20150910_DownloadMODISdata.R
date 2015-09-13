@@ -1,4 +1,9 @@
+# --------------------------------------------------
 # Demonstrate downloading satellite data using MODIS tools
+# Satellite Hydromad
+# Willem Vervoort/Joseph Guillaume
+# September 2015
+# -------------------------------
 # Example catchment  Corin
 
 require(MODISTools)
