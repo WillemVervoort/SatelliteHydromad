@@ -7,7 +7,7 @@
 # Example catchment  Corin
 
 # you might need to set your proxy
-Sys.setenv(http_proxy="web-cache.usyd.edu.au:8080")
+#Sys.setenv(http_proxy="web-cache.usyd.edu.au:8080")
 
 if(!require(MODISTools)) install.packages("MODISTools")
 library(MODISTools)
@@ -25,6 +25,9 @@ coords <- data.frame(lat=xy.loc$lat,
 GetProducts()
 # and check out the data bands that are in the product
 GetBands(Product="MOD16A2")
+
+#Create directory in which to save data
+dir.create("MODIS")
 
 # # Now download data using MODISSubsets (This can take very long)
  MODISSubsets(LoadDat=coords, Product = "MOD16A2",
