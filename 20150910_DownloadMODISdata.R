@@ -6,12 +6,12 @@
 # -------------------------------
 # Example catchment  Corin
 
-require(MODISTools)
-# you migth need to set your proxy
+# you might need to set your proxy
 Sys.setenv(http_proxy="web-cache.usyd.edu.au:8080")
 
-basedir <- "C:/Users/rver4657/ownCloud/working/SatelliteHydromad"
-setwd(basedir)
+if(!require(MODISTools)) install.packages("MODISTools")
+library(MODISTools)
+
 # read in file with xy locations (or create a data.frame)
 xy.loc <- read.csv("CorinPoints.csv")
 # Following the MODIS tools manual
@@ -26,7 +26,7 @@ GetProducts()
 # and check out the data bands that are in the product
 GetBands(Product="MOD16A2")
 
-# # Now use MODISSubsets (This can take very long)
+# # Now download data using MODISSubsets (This can take very long)
  MODISSubsets(LoadDat=coords, Product = "MOD16A2",
                 Bands=c("ET_1km","ET_QC_1km"), StartDate=T, Size=c(0,0),
-                SaveDir=paste(getwd(),"MODIS",sep="/"))
+                SaveDir="MODIS")
