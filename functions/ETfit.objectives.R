@@ -1,16 +1,9 @@
 # --------------------------------------------------
-# Required utility functions and hydromad opbjective functions
+# hydromad objective functions
 # Satellite Hydromad
 # Willem Vervoort/Joseph Guillaume
 # September 2015
 # -------------------------------
-
-# 1. ETa.merge function
-# -----------------------------------
-source("ETa.merge.R")
-
-# 2. Define new objective functions
-# -------------------------------------------------
 
 # use Viney's objective function(includes Bias), to fit 
 # see http://hydromad.catchment.org/#hydromad.stats
@@ -39,19 +32,3 @@ hydromad.stats("ETaggrViney" = function(..., DATA,U) {
   obj <- hmadstat("viney")(coredata(aET.fin),coredata(ET.fin))
   return(obj)
 })
-
-# 3. Utility plot ET data
-# ---------------------------------------------------
-plot.ET <- function(caldata,ModelFit) {
-  plot(caldata$aET[caldata$aET>0,], 
-       xlab="Date", ylab="Actual ET (mm/day)", col="red",
-       lwd=4, lty=2,ylim=c(0,max(caldata$aET)+1), 
-       main = "ETfun using Viney")
-  plot.time <- unique(caldata$et.period)
-  lines(zoo(aggregate(ModelFit$U$ET,
-                      list(date=caldata$et.period),sum),
-            order.by=plot.time))
-  legend("topleft",c("MODIS ET", "Predicted aET"),
-         lwd=c(3,1),col=c("red",1),lty=c(2,1))
-}
-

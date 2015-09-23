@@ -1,5 +1,5 @@
 # --------------------------------------------------
-# Transform MODIS Satellite data to 8 day time series for modelling
+# Function to transform MODIS Satellite data to 8 day time series for modelling
 # Satellite Hydromad
 # Willem Vervoort/Joseph Guillaume
 # September 2015
@@ -7,7 +7,7 @@
 # Dir where MODIS data is stored (extracted with MODISTOOLS), so asc files
 # This function can also work with tif files
 
-source("leapfun.R")
+# Requires leapfun.R
 
 # MODIS transform function
 MODIS.transform <- function(MODISdir="MODIS",patt=".asc",
@@ -120,16 +120,12 @@ MODIS.transform <- function(MODISdir="MODIS",patt=".asc",
 }
 
 
-# Example
-Today <- format(Sys.Date(),"%Y%m%d")
-basedir <- "C:/Users/rver4657/ownCloud/working/SatelliteHydromad"
-setwd(basedir)
-# read in file with xy locations (or create a data.frame)
-xy.loc <- read.csv("CorinPoints.csv")
-
-# run function with defaults
-ET.out <- MODIS.transform()
-
-# write file away
-write.csv(ET.out,paste(Today,"AverageCorinCatchmentET.csv",sep="_"),row.names=F)
-  
+# # Example
+# # read in file with xy locations (or create a data.frame)
+# xy.loc <- read.csv("CorinPoints.csv")
+# 
+# # run function with defaults
+# ET.out <- MODIS.transform()
+# 
+# # write file away
+# write.csv(ET.out,"AverageCorinCatchmentET.csv",row.names=F)
