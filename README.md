@@ -1,5 +1,5 @@
 # SatelliteHydromad
-SatelliteData inclusion in Hydromad
+SatelliteData inclusion into Hydromad Calibration
 
 Project with J. Guillaume, building on Vervoort et al. 2014
 
