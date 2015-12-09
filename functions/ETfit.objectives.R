@@ -18,17 +18,29 @@ hydromad.stats("ETfun" = function(...,DATA,U) {
   .(buildTsObjective(DATA$aET, groups=DATA$et.period, 
                      FUN=sum))(DATA$aET,U$ET,...)})
 
-# Also define an objective function that aggregates ET and fits
-# # Use buildTsObjective to create a new objective function
 # Define an objective function that aggregates ET based on specified periods
-hydromad.stats("ETaggrViney" = function(..., DATA,U) {
+#This can be any objective function, specify using objf
+hydromad.stats("ETaggrViney" = function(..., DATA=DATA,U=U,objf=hmadstat("viney")) {
   #This should be mean if the observed aET is repeated for each point in the period
   # using sum because inserted 0 values in data (ETa.merge)
   # inserted "coredata" statement after discussion with J Guillaume
   # relates to how bias is calculated
   aET.fin <- aggregate(DATA$aET,list(date=coredata(DATA$et.period)),sum)
   ET.fin <- aggregate(U$ET,list(date=coredata(DATA$et.period)),sum)
-  #This can be any objective function
-  obj <- hmadstat("viney")(coredata(aET.fin),coredata(ET.fin))
+
+  obj <- objf(coredata(aET.fin),coredata(ET.fin),...)
   return(obj)
+})
+
+
+# Build a master objective function that has w as a further parameter
+hydromad.stats("JointQandET" = function(Q,X,...,w,DATA,U,objf=hmadstat("viney")) {
+
+  # prepare the ET data
+  aET.fin <- aggregate(coredata(DATA$aET),list(date=coredata(DATA$et.period)),sum)
+  ET.fin <- aggregate(U$ET,list(date=coredata(DATA$et.period)),sum)
+  # calculate overall objective function
+  obj <- ~w*objfun(Q,X,...) + (1-w)*objf(coredata(aET.fin),coredata(ET.fin),...)
+  return(obj)
+
 })
