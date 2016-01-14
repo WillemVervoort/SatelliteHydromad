@@ -7,12 +7,13 @@
 
 # merges the data and puts in et.period to allow 8 day aggregation
 ETa.merge <- function(Flowdata,ETdata, fill=0) {
+  #browser()
   # Flowdata is the standard hydromad input
   # ETdata is the zoo object with 8 day ET data
   # fill is the value to put in the missing dates for ETa
   # this can be NA or 0
   # calculate days.cor    
-  days.cor <- c(diff(time(ETdata)),5)
+  days.cor <- c(diff(time(ETdata)),6)
   # Now we need to replace the -360 values at the end of the year
   # run leap.fun to account for leap years
   # calculate et.period

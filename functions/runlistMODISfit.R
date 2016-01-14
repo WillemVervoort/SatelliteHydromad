@@ -25,7 +25,6 @@ Cotter_mod_M <- hydromad(DATA=data.modis.cal,
                          x3 = c(5,500), x4 = c(0.5,10), 
                          etmult=c(0.01,0.5), 
                          return_state=TRUE)
-
 # Define a function that fits all three (FLOW_MODIS fit by SCE)
 FM_fitBySCE <- function(mod, w=0.5, FIT_base=TRUE,
                         FIT_QET=TRUE,
@@ -47,10 +46,10 @@ FM_fitBySCE <- function(mod, w=0.5, FIT_base=TRUE,
   }
   # 2. Fit Q and ET using JointQandET
   if (FIT_QET==T) {
-    browser()
+    #browser()
     # use master function
     ETQET_fit <- fitBySCE(mod, 
-                           objective=~hmadstat("JointQandET")(Q,X,w,
+                           objective=~hmadstat("JointQandET")(Q,X,w=w,
                                                 DATA=DATA,U=U,
                                                  objf = Objfun))
     
@@ -59,17 +58,17 @@ FM_fitBySCE <- function(mod, w=0.5, FIT_base=TRUE,
   # 3. Fit ET alone using ETAggr and obj fun
   if (FIT_Aggr==T) {
     ETAggr_fit <- fitBySCE(mod,
-                          objective=hmadstat("ETaggrViney")(DATA=DATA,U=U,
+                          objective=~hmadstat("ETaggrViney")(DATA=DATA,U=U,
                                                 objf = Objfun))
   }
   out <- runlist(
-    "Base" = if(!exists("base_fit")) base_fit, 
-    "ET Aggr fit" = if(!exists("ETAggr_fit")) ETAggr_fit,
-    "ET QET fit" = if(!exists("ETQET_fit")) ETQET_fit)
+    "Base" = if(FIT_base==T) base_fit, 
+    "ET Aggr fit" = if(FIT_Aggr==T) ETAggr_fit,
+    "ET QET fit" = if(FIT_QET==T) ETQET_fit)
 return(out)
   
 }
 
 test <- FM_fitBySCE(mod=Cotter_mod_M, FIT_base=F, 
-                    FIT_Aggr = T, FIT_QET = F)
+                    FIT_Aggr = F, FIT_QET = T)
 

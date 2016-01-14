@@ -35,12 +35,12 @@ hydromad.stats("ETaggrViney" = function(..., DATA=DATA,U=U,objf=hmadstat("viney"
 
 # Build a master objective function that has w as a further parameter
 hydromad.stats("JointQandET" = function(Q,X,...,w,DATA,U,objf=hmadstat("viney")) {
-
+#browser()
   # prepare the ET data
-  aET.fin <- aggregate(coredata(DATA$aET),list(date=coredata(DATA$et.period)),sum)
+  aET.fin <- aggregate(coredata(DATA$aET),list(date=coredata(DATA$et.period)),sum)[,2]
   ET.fin <- aggregate(U$ET,list(date=coredata(DATA$et.period)),sum)
   # calculate overall objective function
-  obj <- ~w*objfun(Q,X,...) + (1-w)*objf(coredata(aET.fin),coredata(ET.fin),...)
+  obj <- w*objf(Q,X,...) + (1-w)*objf(coredata(aET.fin),coredata(ET.fin),...)
   return(obj)
 
 })
