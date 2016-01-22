@@ -65,10 +65,45 @@ FM_fitBySCE <- function(mod, w=0.5, FIT_base=TRUE,
     "Base" = if(FIT_base==T) base_fit, 
     "ET Aggr fit" = if(FIT_Aggr==T) ETAggr_fit,
     "ET QET fit" = if(FIT_QET==T) ETQET_fit)
-return(out)
-  
+  class(out) <- c("Mrunlist",class(out))
+  out
 }
 
-test <- FM_fitBySCE(mod=Cotter_mod_M, FIT_base=F, 
-                    FIT_Aggr = F, FIT_QET = T)
+summary.Mrunlist <-
+  function(object, ..., FUN = summary, items = NULL)
+  {
+    stopifnot(is.list(object))
+    if (length(object) == 0)
+      return(NULL)
+    ## extract elements from summary which are single numbers
+
+    cc <- lapply(object, function(x, ...) {
+      tmp <- FUN(x, ...) 
+      if (is.null(items)) {
+        tmp <- tmp[unlist(lapply(tmp, function(z) {
+          is.numeric(z) && !is.matrix(z) &&
+            (length(z) == 1)
+        }))]
+      } else {
+        tmp <- tmp[items]
+      }
+      unlist(tmp)
+    }, ...)
+    ## pad out missing entries with NAs
+    ## find the set of all names
+    allnms <- na.omit(unique(unlist(lapply(cc, names))))
+    ans <- matrix(NA_real_,
+                  nrow = length(object),
+                  ncol = length(allnms),
+                  dimnames = list(names(object), allnms))
+    for (i in 1:NROW(ans))
+      if(length(na.omit(names(cc[[i]])))!=0) {
+        ans[i, names(cc[[i]])] <- cc[[i]]
+      }
+    ans <- as.data.frame(ans)
+    class(ans) <- c("summary.runlist", class(ans))
+    ans
+  }
+
+
 
