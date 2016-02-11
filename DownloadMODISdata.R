@@ -19,7 +19,7 @@ coords <- data.frame(lat=xy.loc$lat,
                      long=xy.loc$lon,
                      start.date=rep(2000,nrow(xy.loc)), 
                      end.date=rep(2008,nrow(xy.loc)), 
-                     transect=1:nrow(xy.loc))
+                     ID=1:nrow(xy.loc))
 
 # We need to figure out the name of the product, you can use GetProducts()
 GetProducts()

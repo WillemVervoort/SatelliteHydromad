@@ -1,7 +1,7 @@
 # ------------------------------
 # Satellite Hydromad project
 # Willem Vervoort/Joseph Guillaume
-# Sept 2015
+# Update Feb 2016
 # Utility function to 
 # Extract the latitude and longitude of points in a shape file (catchment)
 # This requires:
@@ -27,21 +27,26 @@ Extract.points <- function(wdir=getwd(), catchment_file, modis_eg_file,show.plot
   
   # reading in the test MODIS file
   modis <- raster(paste(wdir,modis_eg_file,sep="/")) 
+  # in here equate the projections
+  if (proj4string(modis) != proj4string(shape)) {
+    shape <- spTransform(shape, CRS=CRS(proj4string(modis)))
+  }
+  #browser()
   if(show.plot){
     image(modis)
-    lines(shape)
+    plot(shape, add=T)
   }
   
   # Now clipping to the catchment boundary
   modis.clip <- crop(modis, extent(shape)) 
   modis.clip <- mask(modis.clip, shape)
-
+  
   # Now extracting the points
   p <- rasterToPoints(modis.clip) # it contains the cell values as well
-    
+  
   if(show.plot){
     image(modis.clip)
-    lines(shape)
+    plot(shape, add=T)
     points(p)
   }
   
