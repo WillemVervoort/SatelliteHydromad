@@ -83,8 +83,16 @@ xyplot(Cotter_Fit_B_Viney)
 # Show the ET calibration
 plot.ET(caldata=data.modis.cal,Cotter_Fit_B_Viney)
 
+# **************************************************
 
-# Show how this can be done all together and generate a runlist
-test <- FM_fitBySCE(mod=Cotter_mod_M, FIT_base=F, 
-                    FIT_Aggr = F, FIT_QET = T)
-summary(test)#, items = c("rel.bias", "r.squared","r.sq.sqrt", "r.sq.log"))
+# ----------------------------------------------------------
+# 6. Show how this can be done all together and generate a runlist
+test <- FitMODbySCE(mod=Cotter_mod_M, FIT_Q=T, 
+                    FIT_Q_ET = T, FIT_ET = T)
+summary(test, items = c("rel.bias", "r.squared","r.sq.sqrt", "r.sq.log"))
+
+# plot
+xyplot(test)
+
+# **************************************************
+
