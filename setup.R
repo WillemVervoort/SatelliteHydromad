@@ -13,6 +13,7 @@ source("functions/ETa.merge.R")
 source("functions/ExtractPoints.R")
 source("functions/MODIS_to_Timeseries.R")
 source("functions/plot.ET.R")
+source("functions/runlistMODISfit.R")
 
 #----------------------------
 ##   1.     READ IN DATA       ####
