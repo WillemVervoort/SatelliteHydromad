@@ -7,13 +7,13 @@ if(!require(lattice)) install.packages("lattice")
 library(lattice)
 
 # Load functions
-source("functions/leapfun.R")
-source("functions/ETfit.objectives.R")
-source("functions/ETa.merge.R")
-source("functions/ExtractPoints.R")
-source("functions/MODIS_to_Timeseries.R")
-source("functions/plot.ET.R")
-source("functions/runlistMODISfit.R")
+source("../functions/leapfun.R")
+source("../functions/ETfit.objectives.R")
+source("../functions/ETa.merge.R")
+source("../functions/ExtractPoints.R")
+source("../functions/MODIS_to_Timeseries.R")
+source("../functions/plot.ET.R")
+source("../functions/runlistMODISfit.R")
 
 #----------------------------
 ##   1.     READ IN DATA       ####
