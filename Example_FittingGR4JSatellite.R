@@ -47,13 +47,15 @@ Cotter_mod_M <- hydromad(DATA=data.modis.cal,
                    x3 = c(5,500), x4 = c(0.5,10), 
                    etmult=c(0.01,0.5), 
                    return_state=TRUE)
+hydromad.options(trace=TRUE)
+options(warn=1)
 
 # Evaluate the model using the objective
 # using equal weighting between ETa and Q
 w=0.5
 Cotter_Fit_B <- fitBySCE(Cotter_mod_M, 
-                           objective=~w*hmadstat("viney")(X,Q) +
-                             (1-w)*hmadstat("ETfun")(DATA=DATA,U=U))
+                           objective=~(w*hmadstat("viney") +
+                             (1-w)*hmadstat("ETfun")))
 
 
 summary(Cotter_Fit_B)

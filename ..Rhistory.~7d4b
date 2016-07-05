@@ -1,0 +1,512 @@
+# this function transforms the MODIS data downloaded with MODIS tools
+# to a proper zoo timeseries rather than Julian dates
+# it also does catchment averaging
+# MODISdir is the directory where the MODIS downloads can be found
+# patt is the pattern to look for (Either tif or "asc")
+# start and end are the start and end dates
+# xy.loc are the xy locations of the downloaded sites
+# (only needed if patt = ".tif")
+# This is two column data.frame with lon and lat
+# merge.FUN is the function to use to merge the data
+# if merge.FUN is FALSE, than all the series are returned
+#packages
+require(maptools,quietly=T)
+require(raster,quietly=T)
+require(rgdal,quietly=T)
+# This first looks at the list of files
+x1 <- list.files(path=MODISdir,
+pattern=patt)
+#patt can also be "*tif" will get to this later
+if (patt == ".asc") {
+# for the asc files, each files stores all the values in time for 1 location
+n <- nrow(read.csv(paste(MODISdir,x1[1],sep="/"),header=F))
+# Create storage for the data
+Store <- data.frame(Year = numeric(length=n),
+Jdate = numeric(length=n),
+ET = numeric(length=n))
+# list to store the different locations
+Store1 <- list()
+for (i in 1:length(x1)) {
+Mdata <- read.csv(paste(MODISdir,x1[i],sep="/"),header=F)
+Store[,1] <- as.numeric(substr(Mdata[1:n,8],2,5))
+Store[,2] <- as.numeric(substr(Mdata[1:n,8],6,8))
+Store[,3] <- Mdata[1:n,11]/10 ##  0.1 scaling factor (see MODIS read_me)
+Store1[[i]] <- Store
+}
+} # end if patt = tif
+# in case the files are tif files and need to be first rastered
+if (patt==".tif") {
+# for the tif files, each individual file has all locations for one time
+# define locations as spatial points
+loc <- SpatialPoints(cbind(xy.loc$lon, xy.loc$lat), proj4string=CRS("+proj=longlat"))
+EandN <- spTransform(loc, CRS("+init=epsg:28355"))
+n <- nrow(xy.loc)
+# run through the files and extract values
+Store <- data.frame(Year = numeric(length=n),
+Jdate = numeric(length=n),
+ET = numeric(length=n))
+# list to store the different times
+Store1 <- list()
+for(i in 1:length(x1)){
+#i=1
+#      test <- readGDAL(paste(MODISdir,x1[i],sep="/"))
+Mdata <- raster(paste(MODISdir,x1[i],sep="/"))
+Store[,1] <- as.numeric(substr(strsplit(x1[i],"[.]")[[1]][2],2,5))
+Store[,2] <- as.numeric(substr(strsplit(x1[i],"[.]")[[1]][2],6,8))
+Store[,3] <- extract(Mdata,EandN)
+Store1[[1]] <- Store
+}
+} # end if patt = tif
+# rbind to one data.frame
+ETunlist <- do.call(rbind,Store1)
+# # you can check distribution
+# hist(test$ET, main="Histogram of raw ET values across all pixels",
+#      xlab="8 daily sum ET (mm)")
+# Now aggregate across the catchment
+ET.mean <- aggregate(ETunlist[,3],list(Jdate=ETunlist$Jdate,
+Year=ETunlist$Year), merge.FUN,na.rm=T)
+# Julian Days
+Jdays <- ET.mean$Jdate
+# work out number of days between observations (not always 8!)
+days.cor <- c(diff(as.numeric(Jdays)),5)
+# Now we need to replace the -360 values at the end of the year
+# run leap.fun to account for leap years
+leap <- leap.fun(start,end)
+# correct the -360 values
+days.cor[days.cor==-360] <- leap
+# check
+#days.cor
+## get dates for each 8-day tile
+for (i in 1:(length(days.cor)-1)) {
+if (i ==1) {
+dates.tiles <- seq.Date(as.Date(start),
+by=days.cor[i],length.out=2)
+} else {
+dates.tiles <- c(dates.tiles,
+(seq.Date(as.Date(dates.tiles[length(dates.tiles)]),
+by=days.cor[i],length.out=2))[2])
+}
+}
+# you could make a plot to check
+#plot(as.Date(dates.tiles),ET.mean[,3],type="l")
+return(data.frame(Dates=dates.tiles,ET=ET.mean$x))
+}
+# Example
+basedir <- "C:/Users/rver4657/ownCloud/working/SatelliteHydromad"
+setwd(basedir)
+# read in file with xy locations (or create a data.frame)
+xy.loc <- read.csv("CorinPoints.csv")
+# run function with defaults
+ET.out <- MODIS.transform()
+head(ET.out)
+Today <- format(Sys.Date(),"%Y%m%d")
+write.csv(ET.out,paste(Today,"AverageCorinCatchmentET.csv",sep="_"))
+write.csv(ET.out,paste(Today,"AverageCorinCatchmentET.csv",sep="_"),row.names=F)
+load(Cotter.rdata)
+getwd()
+load("Cotter.rdata")
+head(Cotter)
+str(Cotter)
+require(zoo)
+head(Cotter)
+tail(Cotter)
+Cot_MODISET <- read.csv("20150913_AverageCorinCatchmentET.csv")
+# generalise this data
+save(Cot_MODISET,"CotterMODISET.rdata")
+save(Cot_MODISET,file="CotterMODISET.rdata")
+load("CotterMODISET.rdata")
+Cot_MODISET <- zoo(MODISET[,2], order.by=as.Date(MODISET[,1]))
+MODISET <- read.csv("20150913_AverageCorinCatchmentET.csv")
+Cot_MODISET <- zoo(MODISET[,2], order.by=as.Date(MODISET[,1]))
+save(Cot_MODISET,file="CotterMODISET.rdata")
+load("CotterMODISET.rdata")
+Cotter_m <- merge(Cotter,Cot_MODISET,all=T)
+?exists
+ETa.merge <- function(Flowdata,ETdata) {
+# Flowdata is the standard hydromad input
+# ETdata is the zoo object with 8 day ET data
+# find beginning and end dates
+start <- time(ETdata)[1]
+end <- time(ETdata)[length(ETdata)]
+# check for leap.fun
+if (!exists(leap.fun, mode="function")) source("leapfun.R")
+# run leap.fun
+days.cor <- leap.fun(start.y = start, end.y = end)
+# calculate et.period
+et.period <- zoo(rep(time(ETdata), days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+# now merge all
+out.zoo <- merge(Flowdata ,aET=ETdata, et.period=date.sum,all=T)
+return(out.zoo)
+}
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+ETa.merge <- function(Flowdata,ETdata) {
+# Flowdata is the standard hydromad input
+# ETdata is the zoo object with 8 day ET data
+# find beginning and end dates
+start <- time(ETdata)[1]
+end <- time(ETdata)[length(ETdata)]
+# check for leap.fun
+if (!exists("leap.fun", mode="function")) source("leapfun.R")
+# run leap.fun
+days.cor <- leap.fun(start.y = start, end.y = end)
+# calculate et.period
+et.period <- zoo(rep(time(ETdata), days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+# now merge all
+out.zoo <- merge(Flowdata ,aET=ETdata, et.period=date.sum,all=T)
+return(out.zoo)
+}
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+days.cor <- leap.fun(start.y = start, end.y = end)
+ETdata=Cot_MODISET
+Flowdata=Cotter
+start <- time(ETdata)[1]
+end <- time(ETdata)[length(ETdata)]
+days.cor <- leap.fun(start.y = start, end.y = end)
+days.cor
+diff(time(ETdata))
+et.period <- zoo(rep(time(ETdata), days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+time(ETdata)
+rep(time(ETdata), days.cor)
+rep(time(ETdata), each=days.cor)
+?rep
+rep(time(ETdata), times=days.cor)
+length(days.cor)
+days.cor <- c(diff(time(ETdata)),5)
+rep(time(ETdata), times=days.cor)
+et.period <- zoo(rep(time(ETdata), times=days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+ETa.merge <- function(Flowdata,ETdata) {
+# Flowdata is the standard hydromad input
+# ETdata is the zoo object with 8 day ET data
+# calculate days.cor
+days.cor <- c(diff(time(ETdata)),5)
+# Now we need to replace the -360 values at the end of the year
+# run leap.fun to account for leap years
+# calculate et.period
+et.period <- zoo(rep(time(ETdata), times=days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+# now merge all
+out.zoo <- merge(Flowdata ,aET=ETdata, et.period=date.sum,all=T)
+return(out.zoo)
+}
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+ETa.merge <- function(Flowdata,ETdata) {
+# Flowdata is the standard hydromad input
+# ETdata is the zoo object with 8 day ET data
+# calculate days.cor
+days.cor <- c(diff(time(ETdata)),5)
+# Now we need to replace the -360 values at the end of the year
+# run leap.fun to account for leap years
+# calculate et.period
+et.period <- zoo(rep(time(ETdata), times=days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+# now merge all
+out.zoo <- merge(Flowdata ,aET=ETdata, et.period=et.period,all=T)
+return(out.zoo)
+}
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+# This is one way to do this, but uses the NSE
+# --------------------------------------------------
+# Utility function to create the input data set for the fitting of ET
+# Satellite Hydromad
+# Willem Vervoort/Joseph Guillaume
+# September 2015
+# -------------------------------
+# merges the data and puts in et.period to allow 8 day aggregation
+ETa.merge <- function(Flowdata,ETdata, fill=0) {
+# Flowdata is the standard hydromad input
+# ETdata is the zoo object with 8 day ET data
+# fill is the value to put in the missing dates for ETa
+# this can be NA or 0
+# calculate days.cor
+days.cor <- c(diff(time(ETdata)),5)
+# Now we need to replace the -360 values at the end of the year
+# run leap.fun to account for leap years
+# calculate et.period
+et.period <- zoo(rep(time(ETdata), times=days.cor),
+order.by= seq.Date(as.Date(time(ETdata)[1]),
+by=1,length=sum(days.cor)))
+# now merge all
+out.zoo <- merge(Flowdata ,aET=ETdata, et.period=et.period,all=T)
+# insert fill values for missing aET data
+out.zoo[is.na(out.zoo$aET),"aET"] <- fill
+return(out.zoo)
+}
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+# remake the calibration data
+data.cal <- window(Flow.Modis.zoo, start = "2005-01-01",end = "2008-12-31")
+rm(list=ls())
+library(hydromad)
+library(lattice)
+library(latticeExtra)
+library(zoo)
+Today <- format(Sys.Date(),"%Y%m%d")
+basedir <- "C:/Users/rver4657/ownCloud/working/SatelliteHydromad"
+setwd(basedir)
+load("Cotter.rdata")
+# load MODIS ET data 8 day cycle
+#MODISET <- read.csv("20150913_AverageCorinCatchmentET.csv")
+## convert to zoo
+# Cot_MODISET <- zoo(MODISET[,2], order.by=as.Date(MODISET[,1]))
+## generalise this data for later use
+# save(Cot_MODISET,file="CotterMODISET.rdata")
+load("CotterMODISET.rdata")
+# use Viney's objective function(includes Bias), to fit
+# see http://hydromad.catchment.org/#hydromad.stats
+hydromad.stats("viney" = function(Q, X, ...) {
+hmadstat("r.squared")(Q, X, ...) -
+5*(abs(log(1+hmadstat("rel.bias")(Q,X)))^2.5)})
+# This is one way to do this, but uses the NSE
+# Define an objective function that aggregates ET based on specified periods
+# use buildTsObjective, but this uses the NSE
+hydromad.stats("ETfun" = function(...,DATA,U) {
+.(buildTsObjective(DATA$aET, groups=DATA$et.period,
+FUN=sum))(DATA$aET,U$ET,...)})
+# Also define an objective function that aggregates ET and fits
+# # Use buildTsObjective to create a new objective function
+# Define an objective function that aggregates ET based on specified periods
+hydromad.stats("ETaggrViney" = function(..., DATA,U) {
+#This should be mean if the observed aET is repeated for each point in the period
+# using sum because inserted 0 values in data (ETa.merge)
+# inserted "coredata" statement after discussion with J Guillaume
+# relates to how bias is calculated
+aET.fin <- aggregate(DATA$aET,list(date=coredata(DATA$et.period)),sum)
+ET.fin <- aggregate(U$ET,list(date=coredata(DATA$et.period)),sum)
+#This can be any objective function
+obj <- hmadstat("viney")(coredata(aET.fin),coredata(ET.fin))
+return(obj)
+})
+data.cal <- window(Cotter, start = "2005-01-01",
+end = "2008-12-31")
+# Define the model, important to define return_state=T
+Cotter_mod <- hydromad(DATA=data.cal,
+sma = "gr4j", routing = "gr4jrouting",
+x1 = c(100,1500), x2 = c(-30,20), x3 = c(5,500),
+x4 = c(0.5,10), etmult=c(0.01,0.5),
+return_state=TRUE)
+# Fit without the MODIS data, traditional fit
+# Using shuffled complex evolution algorithm for fitting
+Cotter_fit<- fitBySCE(Cotter_mod,
+objective=~hmadstat("viney")(Q,X))
+# Extract the coefficients and the summary
+summary(Cotter_fit)
+xyplot(Cotter_fit)
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+# remake the calibration data
+data.modis.cal <- window(Flow.Modis.zoo, start = "2005-01-01",end = "2008-12-31")
+# Because we have rebuild data.cal, redefine the model
+Cotter_mod_M <- hydromad(DATA=data.modis.cal,
+sma = "gr4j", routing = "gr4jrouting",
+x1 = c(100,1500), x2 = c(-30,20),
+x3 = c(5,500), x4 = c(0.5,10),
+etmult=c(0.01,0.5),
+return_state=TRUE)
+# Evaluate the model using the objective
+# using equal weighting between ETa and Q
+w=0.5
+Cotter_Fit_B <- fitBySCE(Cotter_mod_M,
+objective=~w*hmadstat("viney")(X,Q) +
+(1-w)*hmadstat("ETfun")(DATA=DATA,U=U))
+summary(Cotter_Fit_B)
+# Plot ET calibration
+plot(data.modis.cal$aET[data.modis.cal$aET>0,], xlab="Date",
+ylab="Actual ET (mm/day)", col="red",
+lwd=4, lty=2,ylim=c(0,max(data.modis.cal$aET)+1),
+main = "ETfun using NSE")
+plot.time <- time(window(Cot_MODISET,"2005-01-01","2008-12-31"))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time))
+legend("topleft",c("MODIS ET", "Predicted aET"),
+lwd=c(3,1),col=c("red",1),lty=c(2,1))
+# ******************************************************
+source(ETa.merge)
+source("ETa.merge.R")
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+# remake the calibration data
+data.modis.cal <- window(Flow.Modis.zoo, start = "2005-01-01",end = "2008-12-31")
+Cotter_mod_M <- hydromad(DATA=data.modis.cal,
+sma = "gr4j", routing = "gr4jrouting",
+x1 = c(100,1500), x2 = c(-30,20),
+x3 = c(5,500), x4 = c(0.5,10),
+etmult=c(0.01,0.5),
+return_state=TRUE)
+w=0.5
+Cotter_Fit_B <- fitBySCE(Cotter_mod_M,
+objective=~w*hmadstat("viney")(X,Q) +
+(1-w)*hmadstat("ETfun")(DATA=DATA,U=U))
+summary(Cotter_Fit_B)
+# Plot ET calibration
+plot(data.modis.cal$aET[data.modis.cal$aET>0,], xlab="Date",
+ylab="Actual ET (mm/day)", col="red",
+lwd=4, lty=2,ylim=c(0,max(data.modis.cal$aET)+1),
+main = "ETfun using NSE")
+plot.time <- time(window(Cot_MODISET,"2005-01-01","2008-12-31"))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time))
+legend("topleft",c("MODIS ET", "Predicted aET"),
+lwd=c(3,1),col=c("red",1),lty=c(2,1))
+window(Cot_MODISET,"2005-01-01","2008-12-31")
+head(Cor_MODISET)
+head(Cot_MODISET)
+tail(Cot_MODISET)
+window(Cot_MODISET,"2005-01-01","2008-12-26")
+window(Cot_MODISET,start="2005-01-01",end="2008-12-26")
+time(window(Cot_MODISET,start="2005-01-01",end="2008-12-26"))
+plot.time <- time(window(Cot_MODISET,start="2005-01-01",end="2008-12-26"))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time))
+?zoo
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time,frequency=NULL))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time,frequency=1))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time,frequency=8))
+lines(zoo(aggregate(Cotter_Fit_B$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time))
+legend("topleft",c("MODIS ET", "Predicted aET"),
+lwd=c(3,1),col=c("red",1),lty=c(2,1))
+w = 0.5
+Cotter_Fit_B_Viney <- fitBySCE(Cotter_mod_M,
+objective=~w*hmadstat("viney")(X,Q) +
+(1-w)*hmadstat("ETaggrViney")(DATA=DATA,U=U))
+summary(Cotter_Fit_B_Viney)
+coef(Cotter_Fit_B_Viney)
+hmadstat("viney")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values)
+hmadstat("ETaggrViney")(DATA=data.modis.cal,U=Cotter_Fit_B_Viney$U)
+# the Q calibration
+xyplot(Cotter_Fit_B_Viney)
+# the ET calibration
+plot(data.modis.cal$aET[data.modis.cal$aET>0,],
+xlab="Date", ylab="Actual ET (mm/day)", col="red",
+lwd=4, lty=2,ylim=c(0,max(data.modis.cal$aET)+1),
+main = "ETfun using Viney")
+lines(zoo(aggregate(Cotter_Fit_B_Viney$U$ET,
+list(date=data.modis.cal$et.period),sum),
+order.by=plot.time))
+legend("topleft",c("MODIS ET", "Predicted aET"),
+lwd=c(3,1),col=c("red",1),lty=c(2,1))
+# --------------------------------------------------
+# Calibration fo GR4J (or any hydromad model using MODISET)
+# Satellite Hydromad
+# Willem Vervoort/Joseph Guillaume
+# September 2015
+# -------------------------------
+# This script is an example script that assumes that you have
+# already downloaded MODIS data and developed a timeseries (zoo object possibly)
+# to merge with the normal hydromad data set
+# this means run: Extract.points() downloaded MODIS data and MODIS.transform()
+# packages needed
+library(hydromad)
+library(lattice)
+library(latticeExtra)
+library(zoo)
+Today <- format(Sys.Date(),"%Y%m%d")
+basedir <- "C:/Users/rver4657/ownCloud/working/SatelliteHydromad"
+setwd(basedir)
+# Utility functions
+source("ETfit.Utilities.R")
+#----------------------------
+##   1.     READ IN DATA       ####
+#-----------------------------
+# the standard Cotter data file, 2000 - 2008
+load("Cotter.rdata")
+# load MODIS ET data 8 day cycle
+#MODISET <- read.csv("20150913_AverageCorinCatchmentET.csv")
+## convert to zoo
+# Cot_MODISET <- zoo(MODISET[,2], order.by=as.Date(MODISET[,1]))
+## generalise this data for later use
+# save(Cot_MODISET,file="CotterMODISET.rdata")
+load("CotterMODISET.rdata")
+# -----------------------------------------------------------
+# 2.Do the standard fitting as test
+# -----------------------------------------------------------
+# Calibration data set
+# Don't use bushfire set (so avoid 2003)
+data.cal <- window(Cotter, start = "2005-01-01",
+end = "2008-12-31")
+# Define the model, important to define return_state=T
+Cotter_mod <- hydromad(DATA=data.cal,
+sma = "gr4j", routing = "gr4jrouting",
+x1 = c(100,1500), x2 = c(-30,20), x3 = c(5,500),
+x4 = c(0.5,10), etmult=c(0.01,0.5),
+return_state=TRUE)
+# Fit without the MODIS data, traditional fit
+# Using shuffled complex evolution algorithm for fitting
+Cotter_fit<- fitBySCE(Cotter_mod,
+objective=~hmadstat("viney")(Q,X))
+# Extract the coefficients and the summary
+summary(Cotter_fit)
+xyplot(Cotter_fit)
+# ***************************************************
+# ----------------------------------------------------------------
+# 3. Including the ET data
+# using ETa.merge()
+Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
+# remake the calibration data
+data.modis.cal <- window(Flow.Modis.zoo, start = "2005-01-01",end = "2008-12-31")
+# Because we have rebuild data.cal, redefine the model
+Cotter_mod_M <- hydromad(DATA=data.modis.cal,
+sma = "gr4j", routing = "gr4jrouting",
+x1 = c(100,1500), x2 = c(-30,20),
+x3 = c(5,500), x4 = c(0.5,10),
+etmult=c(0.01,0.5),
+return_state=TRUE)
+# Evaluate the model using the objective
+# using equal weighting between ETa and Q
+w=0.5
+Cotter_Fit_B <- fitBySCE(Cotter_mod_M,
+objective=~w*hmadstat("viney")(X,Q) +
+(1-w)*hmadstat("ETfun")(DATA=DATA,U=U))
+summary(Cotter_Fit_B)
+# Plot ET calibration
+plot.ET(caldata=data.modis.cal,Cotter_Fit_B)
+# ******************************************************
+# ------------------------------------------------------------
+# 5. Now use the ETaggregate objective function (Viney)
+# Fit the model again, using equal weighting
+w = 0.5
+Cotter_Fit_B_Viney <- fitBySCE(Cotter_mod_M,
+objective=~w*hmadstat("viney")(X,Q) +
+(1-w)*hmadstat("ETaggrViney")(DATA=DATA,U=U))
+summary(Cotter_Fit_B_Viney)
+coef(Cotter_Fit_B_Viney)
+# Calculate the performance measures
+hmadstat("viney")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values)
+hmadstat("ETaggrViney")(DATA=data.modis.cal,U=Cotter_Fit_B_Viney$U)
+# Show the Q calibration (standard)
+xyplot(Cotter_Fit_B_Viney)
+# Show the ET calibration
+plot.ET(caldata=data.modis.cal,Cotter_Fit_B_Viney)
+# ***********************************************************
+plot.ET(caldata=data.modis.cal,Cotter_Fit_B)
+plot.ET <- function(caldata,ModelFit) {
+plot(caldata$aET[caldata$aET>0,],
+xlab="Date", ylab="Actual ET (mm/day)", col="red",
+lwd=4, lty=2,ylim=c(0,max(caldata$aET)+1),
+main = "ETfun using Viney")
+plot.time <- unique(caldata$et.period)
+lines(zoo(aggregate(ModelFit$U$ET,
+list(date=caldata$et.period),sum),
+order.by=plot.time))
+legend("topleft",c("MODIS ET", "Predicted aET"),
+lwd=c(3,1),col=c("red",1),lty=c(2,1))
+}
+plot.ET(caldata=data.modis.cal,Cotter_Fit_B)
+plot.ET(caldata=data.modis.cal,Cotter_Fit_B_Viney)
