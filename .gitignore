@@ -10,3 +10,4 @@ vignettes/*.html
 vignettes/*.pdf
 .Rproj.user
 20150913_FittingGR4JSatellite.R
+.RData
