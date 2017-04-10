@@ -32,7 +32,7 @@ FitMODbySCE <- function(mod, w = 0.5, FIT_Q = TRUE,
     # use master function
     ETQET_fit <- fitBySCE(mod, 
                            objective=~hmadstat("JointQandET")(Q,X,w=w,
-                                                DATA=DATA,U=U,
+                                                DATA=DATA, model=model,
                                                  objf = Objfun))
     
   }
@@ -40,7 +40,9 @@ FitMODbySCE <- function(mod, w = 0.5, FIT_Q = TRUE,
   # 3. Fit ET alone using ETAggr and obj fun
   if (FIT_ET==T) {
     ETAggr_fit <- fitBySCE(mod,
-                          objective=~hmadstat("ETaggrViney")(DATA=DATA,U=U,
+                          objective=~hmadstat("ETaggr")(Q=Q,X=X,
+                                                        DATA=DATA,
+                                                        model=model,
                                                 objf = Objfun))
   }
   out <- runlist(

@@ -41,8 +41,16 @@ round(summary(allMods),2)
 
 # Satellite ET extension
 #1. Load packages, data, 2. define objective functions
-source("setup.R")
-
+#source("setup.R")
+source("functions/leapfun.R")
+source("functions/ETfit.objectives.R")
+source("functions/ETa.merge.R")
+#source("functions/ExtractPoints.R")
+#source("functions/MODIS_to_Timeseries.R")
+source("functions/plot.ET.R")
+source("functions/runlistMODISfit.R")
+load("Examples/CotterMODISET.rdata")
+load("Examples/Cotter.rdata")
 # -----------------------------------------------------------
 # 3.Do the standard fitting as test
 # -----------------------------------------------------------
@@ -88,8 +96,8 @@ options(warn=1)
 
 # ******************************************************
 # fit only on ET data
-Cotter_Fit_ET <- fitBySCE(Cotter_mod_M, 
-                          objective=~hmadstat("ETfun")(DATA=DATA,U=U))
+Cotter_Fit_ET <- fitBySCE(Cotter_mod_M,
+                  objective=~hmadstat("ETfun")(Q=Q,X=X,DATA=DATA,model=Cotter_mod_M))
 summary(Cotter_Fit_ET)
 coef(Cotter_Fit_ET)
 # Show the ET calibration
@@ -101,8 +109,9 @@ plot.ET(caldata=data.modis.cal,Cotter_Fit_ET, main="ETfun using NSE")
 # Fit the model again, using equal weighting
 w = 0.5
 Cotter_Fit_B_Viney <- fitBySCE(Cotter_mod_M, 
-                               objective=~w*hmadstat("viney")(X,Q) +
-                                 (1-w)*hmadstat("ETaggrViney")(DATA=DATA,U=U))
+                               objective=~w*hmadstat("viney")(Q,X) +
+                                 (1-w)*hmadstat("ETaggr")(Q=Q,X=X,DATA=DATA,
+                                                               model=model))
 
 
 summary(Cotter_Fit_B_Viney)
@@ -110,7 +119,10 @@ coef(Cotter_Fit_B_Viney)
 
 # Calculate the performance measures
 hmadstat("viney")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values)
-hmadstat("ETaggrViney")(DATA=data.modis.cal,U=Cotter_Fit_B_Viney$U)
+# this does not work yet
+# hmadstat("ETaggr")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values,
+#                    DATA=data.modis.cal,
+#                    model=Cotter_Fit_B_Viney)
 # Show the Q calibration (standard)
 xyplot(Cotter_Fit_B_Viney)
 
@@ -123,7 +135,9 @@ plot.ET(caldata=data.modis.cal,Cotter_Fit_B_Viney, main="ETfun using Viney")
 # 6. Show how this can be done all together and generate a runlist
 test <- FitMODbySCE(mod=Cotter_mod_M, FIT_Q=T, 
                     FIT_Q_ET = T, FIT_ET = T)
-summary(test, items = c("rel.bias", "r.squared","r.sq.sqrt", "r.sq.log"))
+round(summary(test, 
+              items = c("rel.bias", "r.squared",
+                        "r.sq.sqrt", "r.sq.log")),2)
 
 # plot
 xyplot(test)
