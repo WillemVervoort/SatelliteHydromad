@@ -78,10 +78,10 @@ coef(Cotter_Fit_B_Viney)
 
 # Calculate the performance measures
 hmadstat("viney")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values)
-# does not work at the moment
-# hmadstat("ETaggr")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values,
-#                    DATA=data.modis.cal,
-#                    model=Cotter_Fit_B_Viney)
+# ETaggr value is a bit mroe tricky
+hmadstat("ETaggr")(Q=observed(Cotter_Fit_B_Viney),
+                   X=fitted(Cotter_Fit_B_Viney),
+                   DATA=observed(Cotter_Fit_B_Viney,select=T), model=Cotter_Fit_B_Viney)
 # Show the Q calibration (standard)
 xyplot(Cotter_Fit_B_Viney)
 
