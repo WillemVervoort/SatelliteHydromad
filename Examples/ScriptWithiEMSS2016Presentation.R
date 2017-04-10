@@ -1,5 +1,7 @@
 # Presentation iEMSS 2016
 # some examples from Hydromad
+# working directory should be "examples"
+
 library(hydromad)
 # plot the basic data
 data(Cotter)
@@ -41,16 +43,7 @@ round(summary(allMods),2)
 
 # Satellite ET extension
 #1. Load packages, data, 2. define objective functions
-#source("setup.R")
-source("functions/leapfun.R")
-source("functions/ETfit.objectives.R")
-source("functions/ETa.merge.R")
-#source("functions/ExtractPoints.R")
-#source("functions/MODIS_to_Timeseries.R")
-source("functions/plot.ET.R")
-source("functions/runlistMODISfit.R")
-load("Examples/CotterMODISET.rdata")
-load("Examples/Cotter.rdata")
+source("setup.R")
 # -----------------------------------------------------------
 # 3.Do the standard fitting as test
 # -----------------------------------------------------------

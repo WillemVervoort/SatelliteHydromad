@@ -5,11 +5,12 @@
 # September 2015
 # -------------------------------
 
+# working directory should in "examples"
 #1. Load packages, data, 2. define objective functions
 source("setup.R")
 
 # -----------------------------------------------------------
-# 3.Do the standard fitting as test
+# 2.Do the standard fitting as test
 # -----------------------------------------------------------
 # Calibration data set
 # Don't use bushfire set (so avoid 2003)
@@ -33,7 +34,7 @@ xyplot(Cotter_fit)
 # ***************************************************
 
 # ----------------------------------------------------------------
-# 4. Including the ET data
+# 3. Including the ET data
 # using ETa.merge()
 Flow.Modis.zoo <- ETa.merge(Flowdata=Cotter,ETdata=Cot_MODISET)
 
@@ -54,9 +55,8 @@ options(warn=1)
 # using equal weighting between ETa and Q
 w=0.5
 Cotter_Fit_B <- fitBySCE(Cotter_mod_M, 
-                           objective=~(w*hmadstat("viney") +
-                             (1-w)*hmadstat("ETfun")))
-
+                           objective=~w*hmadstat("viney") +
+                             (1-w)*hmadstat("ETfun")(Q=Q,X=X,DATA=DATA,model=Cotter_mod_M))
 
 summary(Cotter_Fit_B)
 # Plot ET calibration
@@ -65,20 +65,23 @@ plot.ET(caldata=data.modis.cal,Cotter_Fit_B)
 # ******************************************************
 
 # ------------------------------------------------------------
-# 5. Now use the ETaggregate objective function (Viney)
+# 4. Now use the ETaggregate objective function (Viney)
 # Fit the model again, using equal weighting
 w = 0.5
 Cotter_Fit_B_Viney <- fitBySCE(Cotter_mod_M, 
                          objective=~w*hmadstat("viney")(X,Q) +
-                           (1-w)*hmadstat("ETaggrViney")(DATA=DATA,U=U))
-
+                           (1-w)*hmadstat("ETaggr")(Q=Q,X=X,DATA=DATA,
+                                                    model=model))
 
 summary(Cotter_Fit_B_Viney)
 coef(Cotter_Fit_B_Viney)
 
 # Calculate the performance measures
 hmadstat("viney")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values)
-hmadstat("ETaggrViney")(DATA=data.modis.cal,U=Cotter_Fit_B_Viney$U)
+# does not work at the moment
+# hmadstat("ETaggr")(Q=data.modis.cal$Q,X=Cotter_Fit_B_Viney$fitted.values,
+#                    DATA=data.modis.cal,
+#                    model=Cotter_Fit_B_Viney)
 # Show the Q calibration (standard)
 xyplot(Cotter_Fit_B_Viney)
 
@@ -88,7 +91,7 @@ plot.ET(caldata=data.modis.cal,Cotter_Fit_B_Viney)
 # **************************************************
 
 # ----------------------------------------------------------
-# 6. Show how this can be done all together and generate a runlist
+# 5. Show how this can be done all together and generate a runlist
 test <- FitMODbySCE(mod=Cotter_mod_M, FIT_Q=T, 
                     FIT_Q_ET = T, FIT_ET = T)
 summary(test, items = c("rel.bias", "r.squared","r.sq.sqrt", "r.sq.log"))
